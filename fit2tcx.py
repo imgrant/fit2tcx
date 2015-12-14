@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #
-# Fit to TCX
+# fit2tcx - convert a FIT file to a TCX file
 #
-# Copyright (c) 2012, Gustav Tiger <gustav@tiger.name>
-# Modified 2015, Ian Grant <ian@iangrant.me>
+# Copyright (c) 2012, Gustav Tiger <gustav@tiger.name> [https://github.com/Tigge/FIT-to-TCX/]
+# Copyright (c) 2014-2015, Ian Grant <ian@iangrant.me> [https://github.com/imgrant/fit2tcx]
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-"""Convert a FIT file to a TCX file"""
+__version__ = "1.1"
 
 import sys
 import os
@@ -99,11 +99,6 @@ NSMAP = {
     None: TCD_NAMESPACE,
     "xsi": XML_SCHEMA_NAMESPACE}
 
-
-"""
-fit2tcx
-"""
-VERSION = 1.0
 
 
 # Class and context manager to suppress stdout for use with tzwhere.
@@ -285,7 +280,7 @@ def add_author(document):
     create_sub_element(author, "Name", "fit2tcx Converter")
     build = create_sub_element(author, "Build")
     version = create_sub_element(build, "Version")
-    vMajor, vMinor = tuple(map(int, (str(VERSION).split("."))))
+    vMajor, vMinor = tuple(map(int, (__version__.split("."))))
     create_sub_element(version, "VersionMajor", str(vMajor))
     create_sub_element(version, "VersionMinor", str(vMinor))
     create_sub_element(version, "BuildMajor", "0")
@@ -882,10 +877,15 @@ def convert(filename,
 def main():
     """Read arguments from command line to convert FIT file to TCX"""
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog="fit2tcx")
 
     parser.add_argument("FitFile", help="Input FIT file")
     parser.add_argument("TcxFile", help="Output TCX file")
+    parser.add_argument(
+        "-v",
+        "--version",
+        action='version',
+        version='%(prog)s {version}'.format(version=__version__))
     parser.add_argument(
         "-t",
         "--local-timezone",
