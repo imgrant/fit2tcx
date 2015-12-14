@@ -3,7 +3,7 @@
 # Fit to TCX
 #
 # Copyright (c) 2012, Gustav Tiger <gustav@tiger.name>
-# Modified 2014, Ian Grant <ian@iangrant.me>
+# Modified 2015, Ian Grant <ian@iangrant.me>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -98,6 +98,12 @@ SCHEMA_LOCATION = \
 NSMAP = {
     None: TCD_NAMESPACE,
     "xsi": XML_SCHEMA_NAMESPACE}
+
+
+"""
+fit2tcx
+"""
+VERSION = 1.0
 
 
 # Class and context manager to suppress stdout for use with tzwhere.
@@ -276,16 +282,32 @@ def add_author(document):
     """Add author element (TCX writer) to TCX"""
     author = create_sub_element(document.getroot(), "Author")
     author.set(XML_SCHEMA + "type", "Application_t")
-    create_sub_element(author, "Name", "fit2tcx")
+    create_sub_element(author, "Name", "fit2tcx Converter")
+    build = create_sub_element(author, "Build")
+    version = create_sub_element(build, "Version")
+    vMajor, vMinor = tuple(map(int, (str(VERSION).split("."))))
+    create_sub_element(version, "VersionMajor", str(vMajor))
+    create_sub_element(version, "VersionMinor", str(vMinor))
+    create_sub_element(version, "BuildMajor", "0")
+    create_sub_element(version, "BuildMinor", "0")
     create_sub_element(author, "LangID", "en")
+    create_sub_element(author, "PartNumber", "000-00000-00")
 
 
-def add_creator(element, manufacturer, productID):
+def add_creator(element, manufacturer, productID, serial):
     """Add creator element (recording device) to TCX activity"""
     creator = create_sub_element(element, "Creator")
     creator.set(XML_SCHEMA + "type", "Device_t")
-    product = PRODUCT_MAP[productID] if productID in PRODUCT_MAP else "Unknown"
+    product = PRODUCT_MAP[productID] if productID in PRODUCT_MAP else ProductID
     create_sub_element(creator, "Name", manufacturer + " " + product)
+    unitID = int(serial or 0)
+    create_sub_element(creator, "UnitId", str(unitID))
+    create_sub_element(creator, "ProductID", "0")
+    version = create_sub_element(creator, "Version")
+    create_sub_element(version, "VersionMajor", "0")
+    create_sub_element(version, "VersionMinor", "0")
+    create_sub_element(version, "BuildMajor", "0")
+    create_sub_element(version, "BuildMinor", "0")
 
 
 def add_notes(element, text):
@@ -400,54 +422,76 @@ def add_lap(element,
         lapelem = create_sub_element(element, "Lap")
         lapelem.set("StartTime", iso_Z_format(start_time))
 
+
+        #
+        # TotalTimeSeconds
+        #
         create_sub_element(lapelem, "TotalTimeSeconds", str("%d" % totaltime))
+
+
+        #
+        # DistanceMeters
+        #
         lap_dist_elem = create_sub_element(lapelem,
                                            "DistanceMeters",
                                            str("%d" % stored_distance)
                                            )
+
+
+        #
+        # MaximumSpeed
+        #
         lap_max_spd_elem = create_sub_element(lapelem,
                                               "MaximumSpeed",
                                               str("%.3f" % max_speed))
+
+
+        #
+        # Calories
+        #
         create_sub_element(lapelem, "Calories", str("%d" % calories))
+
+
+        #
+        # AverageHeartRateBpm
+        #
         if avg_heart is not None:
             heartrateelem = create_sub_element(lapelem, "AverageHeartRateBpm")
             heartrateelem.set(
                 XML_SCHEMA + "type", "HeartRateInBeatsPerMinute_t")
             create_sub_element(heartrateelem, "Value", str("%d" % avg_heart))
+
+
+        #
+        # MaximumHeartRateBpm
+        #
         if max_heart is not None:
             heartrateelem = create_sub_element(lapelem, "MaximumHeartRateBpm")
             heartrateelem.set(
                 XML_SCHEMA + "type", "HeartRateInBeatsPerMinute_t")
             create_sub_element(heartrateelem, "Value", str("%d" % max_heart))
-        create_sub_element(lapelem, "Intensity", intensity)
-        create_sub_element(lapelem, "TriggerMethod", triggermet)
 
+
+        #
+        # Intensity
+        #
+        create_sub_element(lapelem, "Intensity", intensity)
+
+
+        #
+        # Cadence (bike)
+        #
         if avg_speed or avg_cadence or max_cadence:
             if sport == "Biking" and avg_cadence is not None:
                 # Average bike cadence is stored in main lap element,
                 # not as an extension, unlike average running cadence (below)
                 create_sub_element(lapelem, "Cadence", str("%d" % avg_cadence))
-            exelem = create_sub_element(lapelem, "Extensions")
-            lx = create_sub_element(exelem, "LX")
-            lx.set("xmlns",
-                   "http://www.garmin.com/xmlschemas/ActivityExtension/v2")
-            if avg_speed is not None:
-                lap_avg_spd_elem = create_sub_element(lx,
-                                                      "AvgSpeed",
-                                                      str("%.3f" % avg_speed))
-            if avg_cadence is not None and sport == "Running":
-                create_sub_element(lx,
-                                   "AvgRunCadence",
-                                   str("%d" % avg_cadence))
-            if max_cadence is not None:
-                if sport == "Running":
-                    create_sub_element(lx,
-                                       "MaxRunCadence",
-                                       str("%d" % max_cadence))
-                elif sport == "Biking":
-                    create_sub_element(lx,
-                                       "MaxBikeCadence",
-                                       str("%d" % max_cadence))
+
+
+        #
+        # TriggerMethod
+        #
+        create_sub_element(lapelem, "TriggerMethod", triggermet)
 
         if dist_recalc:
             distance_used = calculated_distance
@@ -459,42 +503,10 @@ def add_lap(element,
         else:
             distance_used = stored_distance
 
-        if fixed_distance is not None:
-            precision_str = ("; known distance: {ref_dist:.3f} km "
-                             "(FIT precision: {fit_precision:.1f}%; "
-                             "GPS precision: {gps_precision:.1f}%)")
-            reference = "known distance"
-        else:
-            precision_str = " (precision: {precision:.1f}%)"
-            reference = "GPS"
 
-        notes = ("{distance_used:.3f} km in {total_time!s}\n"
-                 "Distance in FIT file: {fit_dist:.3f} km; "
-                 "calculated via GPS: {gps_dist:.3f} km"
-                 + precision_str + "\n"
-                 "Footpod calibration factor setting: {old_cf:.1f}%; "
-                 "new factor based on {reference} for this lap: {new_cf:.1f}%"
-                 ).format(distance_used=distance_used / 1000,
-                          total_time=timedelta(seconds=int(totaltime)),
-                          fit_dist=stored_distance / 1000,
-                          gps_dist=calculated_distance / 1000,
-                          ref_dist=reference_distance / 1000,
-                          fit_precision=(1 - (abs(reference_distance -
-                                                  stored_distance) /
-                                              reference_distance)) * 100,
-                          gps_precision=(1 - (abs(reference_distance -
-                                                  calculated_distance) /
-                                              reference_distance)) * 100,
-                          precision=(1 - (abs(calculated_distance -
-                                                  stored_distance) /
-                                              calculated_distance)) * 100,
-                          old_cf=current_cal_factor,
-                          reference=reference,
-                          new_cf=lap_scaling_factor * current_cal_factor)
-
-        add_notes(lapelem, notes)
-
-        # Add track points to lap...
+        #
+        # Track
+        #
         trackelem = create_sub_element(lapelem, "Track")
         # First build tps array (using timestamp as the index)
         # in order to coalesce values at the same timepoint
@@ -574,17 +586,21 @@ def add_lap(element,
                 else:
                     tp_dist = tp['distance'] - prev['distance']
 
-                if speed_recalc:
-                    tp_speed = gps_speed
-                elif calibrate:
-                    tp_speed = tp['speed'] * scaling_factor
-                else:
-                    tp_speed = tp['speed']
+                try:
+                    if speed_recalc:
+                        tp_speed = gps_speed
+                    elif calibrate:
+                        tp_speed = tp['speed'] * scaling_factor
+                    else:
+                        tp_speed = tp['speed']
 
-                total_cumulative_distance += tp_dist
-                distance += tp_dist
-                if tp_speed > max_speed:
-                    max_speed = tp_speed
+                    total_cumulative_distance += tp_dist
+                    distance += tp_dist
+                    if tp_speed > max_speed:
+                        max_speed = tp_speed
+
+                except TypeError:
+                    tp_speed = None
 
             # Store previous trackpoint before changing the current one
             prev = copy.copy(tp)
@@ -601,6 +617,71 @@ def add_lap(element,
 
             # Add trackpoint element
             add_trackpoint(trackpointelem, tp, sport)
+
+
+        #
+        # Notes
+        #
+        if fixed_distance is not None:
+            precision_str = ("; known distance: {ref_dist:.3f} km "
+                             "(FIT precision: {fit_precision:.1f}%; "
+                             "GPS precision: {gps_precision:.1f}%)")
+            reference = "known distance"
+        else:
+            precision_str = " (precision: {precision:.1f}%)"
+            reference = "GPS"
+        notes = ("Lap {lap_number:d}: {distance_used:.3f} km in {total_time!s}\n"
+                 "Distance in FIT file: {fit_dist:.3f} km; "
+                 "calculated via GPS: {gps_dist:.3f} km"
+                 + precision_str + "\n"
+                 "Footpod calibration factor setting: {old_cf:.1f}%; "
+                 "new factor based on {reference} for this lap: {new_cf:.1f}%"
+                 ).format(lap_number=lap_num,
+                          distance_used=distance_used / 1000,
+                          total_time=timedelta(seconds=int(totaltime)),
+                          fit_dist=stored_distance / 1000,
+                          gps_dist=calculated_distance / 1000,
+                          ref_dist=reference_distance / 1000,
+                          fit_precision=(1 - (abs(reference_distance -
+                                                  stored_distance) /
+                                              reference_distance)) * 100,
+                          gps_precision=(1 - (abs(reference_distance -
+                                                  calculated_distance) /
+                                              reference_distance)) * 100,
+                          precision=(1 - (abs(calculated_distance -
+                                                  stored_distance) /
+                                              calculated_distance)) * 100,
+                          old_cf=current_cal_factor,
+                          reference=reference,
+                          new_cf=lap_scaling_factor * current_cal_factor)
+        add_notes(lapelem, notes)
+
+
+        #
+        # Extensions (AvgSpeed, AvgRunCadence, MaxRunCadence, MaxBikeCadence)
+        #
+        if avg_speed or avg_cadence or max_cadence:
+            exelem = create_sub_element(lapelem, "Extensions")
+            lx = create_sub_element(exelem, "LX")
+            lx.set("xmlns",
+                   "http://www.garmin.com/xmlschemas/ActivityExtension/v2")
+            if avg_speed is not None:
+                lap_avg_spd_elem = create_sub_element(lx,
+                                                      "AvgSpeed",
+                                                      str("%.3f" % avg_speed))
+            if avg_cadence is not None and sport == "Running":
+                create_sub_element(lx,
+                                   "AvgRunCadence",
+                                   str("%d" % avg_cadence))
+            if max_cadence is not None:
+                if sport == "Running":
+                    create_sub_element(lx,
+                                       "MaxRunCadence",
+                                       str("%d" % max_cadence))
+                elif sport == "Biking":
+                    create_sub_element(lx,
+                                       "MaxBikeCadence",
+                                       str("%d" % max_cadence))
 
         # Adjust overall lap distance & speed values if required
         if calibrate:
@@ -701,7 +782,9 @@ def convert(filename,
     element = create_sub_element(document.getroot(), "Activities")
 
     try:
-        activity = FitFile(filename, data_processor=MyDataProcessor())
+        activity = FitFile(filename,
+                            check_crc=False,
+                            data_processor=MyDataProcessor())
         activity.parse()
         if tz_is_local:
             lat = None
@@ -712,6 +795,7 @@ def convert(filename,
                 lat = trackpoint.get_value("position_lat")
                 lon = trackpoint.get_value("position_long")
             activity = FitFile(filename,
+                               check_crc=False,
                                data_processor=TZDataProcessor(lat=lat,
                                                               lon=lon))
             activity.parse()
@@ -767,13 +851,14 @@ def convert(filename,
 
         method = "(" + ", ".join(parts) + reference + ")"
 
-    notes = ("{distance_used:.3f} km in {total_time!s} {dist_method:s}\n"
+    notes = ("{total_laps:d} laps: {distance_used:.3f} km in {total_time!s} {dist_method:s}\n"
              "Distance in FIT file: {fit_dist:.3f} km; "
              "calculated via GPS: {gps_dist:.3f} km "
              "(precision: {precision:.1f}%)\n"
              "Footpod calibration factor setting: {old_cf:.1f}%; "
              "new factor based on recomputed distance: {new_cf:.1f}%"
-             ).format(distance_used=distance_used / 1000,
+             ).format(total_laps=session.get_value('num_laps'),
+                      distance_used=distance_used / 1000,
                       total_time=timedelta(seconds=int(session.get_value(
                           'total_timer_time'))),
                       fit_dist=total_activity_distance / 1000,
@@ -787,7 +872,9 @@ def convert(filename,
     add_notes(actelem, notes)
     add_creator(actelem,
                 activity.messages[0].get_value('manufacturer').capitalize(),
-                activity.messages[0].get_value('product'))
+                activity.messages[0].get_value('product'),
+                activity.messages[0].get_value('serial_number')
+                )
     add_author(document)
     return document
 
