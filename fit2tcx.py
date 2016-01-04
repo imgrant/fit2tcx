@@ -905,19 +905,19 @@ def main():
         "-c",
         "--calibrate-footpod",
         action="store_true",
-        help="Use GPS-measured and/or known distance to calibrate footpod data"),
+        help="Use GPS-measured and/or known distance to calibrate footpod data")
     parser.add_argument(
         "-p",
         "--per-lap-calibration",
         action="store_true",
-        help="Apply footpod calibration on a per lap basis"),
+        help="Apply footpod calibration on a per lap basis")
     parser.add_argument(
         "-l",
         "--manual-lap-distance",
         action="append",
         default=None,
         type=float,
-        help="Manually specify known lap distance(s) (in metres, use calibration to apply)"),
+        help="Manually specify known lap distance(s) (in metres, use calibration to apply)")
     parser.add_argument(
         "-f",
         "--calibration-factor",
@@ -940,7 +940,7 @@ def main():
         activity_notes = document.getroot().findtext(".//{*}Activity/{*}Notes")
         if activity_notes is not None:
             sys.stderr.write(str(activity_notes) + "\n")
-        tcx = open(args.TcxFile, 'w')
+        tcx = open(args.TcxFile, 'wb')
         tcx.write(lxml.etree.tostring(document.getroot(),
                                       pretty_print=True,
                                       xml_declaration=True,
