@@ -1,11 +1,133 @@
 # fit2tcx
 Convert a FIT file to TCX format
 
-fit2tcx is largely based on [FIT-to-TCX](https://github.com/Tigge/FIT-to-TCX) by Gustav Tiger and is ostensibly designed for use with Timex Run Trainer 2.0.
+fit2tcx is largely based on [FIT-to-TCX](https://github.com/Tigge/FIT-to-TCX) by Gustav Tiger and is ostensibly designed for use with the Timex Run Trainer 2.0, which produces slightly broken FIT files that cannot be uploaded to some services (e.g. Garmin Connect) or do not work correctly with others (e.g. Strava ignores lap data, Training Peaks shows 100 laps).
 
-Lap structure is preserved, and additional options have been added for recalculating/recalibrating stored speed and distance data from the GPS track in the case where a footpod was used.
+fit2tcx aims to be the most complete FTI to TCX converter for this situation; it preserves lap structure, cadence and heart rate data, and produces fully compliant TCX files that can be uploaded to Garmin Connect, Strava, etc.
+
+Additional functions are provided for recalculating/recalibrating stored speed and distance data from the GPS track in the case where a footpod was used, or manually specifying known distances and rescaling the data accordingly.
+
+
+## Summary
+    usage: fit2tcx [-h] [-v] [-t] [-d] [-s] [-c] [-p] [-l MANUAL_LAP_DISTANCE]
+                   [-f CALIBRATION_FACTOR]
+                   FitFile TcxFile
+
+    positional arguments:
+      FitFile               Input FIT file
+      TcxFile               Output TCX file
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -v, --version         show program's version number and exit
+      -t, --local-timezone  FIT file timestamps are in a local timezone
+                            (default is assume UTC)
+      -d, --recalculate-distance-from-gps
+                            Recalculate distance from GPS data
+      -s, --recalculate-speed-from-gps
+                            Recalculate speed from GPS data
+      -c, --calibrate-footpod
+                            Use GPS-measured and/or known distance to
+                            calibrate footpod data
+      -p, --per-lap-calibration
+                            Apply footpod calibration on a per lap basis
+      -l MANUAL_LAP_DISTANCE, --manual-lap-distance MANUAL_LAP_DISTANCE
+                            Manually specify known lap distance(s) (in
+                            metres, use calibration to apply)
+      -f CALIBRATION_FACTOR, --calibration-factor CALIBRATION_FACTOR
+                            Existing calibration factor (defaults to 100.0)
+
+## Options
+* `--local-timezone`
+ Use this option with the Timex Run Trainer 2.0, which incorrectly stores the time in the FIT file in the local timezone, rather than UTC (as mandated by the FIT specification). It converts the time to UTC by determining which local timezone applies to the activity based on the starting coordinates.
+
+* `--recalculate-distance-from-gps`
+This option recalculates the cumulative distance stream in the TCX file from the GPS data. Use this if you recorded distance from a footpod and wish to use the GPS data instead; if you used GPS to record the distance, there will be no (or little) difference.
+
+* `--recalculate-speed-from-gps`
+Similar to the previous option, this recalculates the speed data stream in the TCX file from the GPS data (i.e. by dividing the distance between trackpoints by the time elapsed). Use this if you recorded pace from a footpod and wish to use the GPS data instead.
+
+* `--calibrate-footpod`
+Use this option if the activity was recorded with a footpod and you wish to retrospectively calibrate it, based on the GPS data or manual distance (see below). If enabled, the distance and speed for each trackpoint will be scaled by a computed factor such that the total distance equals that calculated from GPS (or manually specified).
+
+* `--per-lap-calibration`
+In conjunction with the calibrate option (above), this option calculates a separate scaling factor for each lap in the activity, rather than a single factor for the whole activity.
+
+* `--manual-lap-distance MANUAL_LAP_DISTANCE` (in metres)
+Use this option when you know the actual distance of the activity (e.g. an athletics track). Scaling factors for calibration will then be based on this number, rather than that from GPS.
+Specify the argument multiple times, once for each lap, in the order that laps were recorded, as appropriate (e.g. `-l 400 -l 800 -l 1609` for three laps, of 400 m, 800 m, and 1 mile). If you specify fewer distances than laps in the FIT file, subsequent laps will use the GPS-determined distance.
+
+* `--calibration-factor`
+Specify the calibration factor that was set on the watch when the activity was recorded (assumes 100.0% by default).
+
 
 ## Notes
-The `-t` or `--local-timezone` option is aimed at the Timex Run Trainer 2.0, which stores the time in local time format, rather than UTC. It will look up the coordinates of the start of the run and work out what the time difference from UTC is.
+The `-c (--calibrate-footpod)` option can be used with the `-d (--recalculate-distance-from-gps)` option to produce a file where the distance is determined by GPS, but the pace comes from the (auto-calibrated) footpod data; this is useful when you want to run with the footpod for instance pace, but use GPS for distance (albeit an after-the-fact computation).
 
-For manual specification of lap distances, use multiple `-l` or `--manual-lap-distance` parameters, in the order of the laps in the file, as appropriate.
+Note that even if the `-d` or `-c` arguments are not given, information about GPS-recorded distance and footpod accuracy is recorded in the notes for each lap and the activity overall (the values are, of course, not used to change the actual data in the TCX file in the arguments aren't given), allowing you to compare. In the event that the FIT file was recorded using GPS data, the values will be the same and the footpod accuracy will be 100.0% (i.e. fit2tcx assumes that the distance reported by the FIT file comes from a footpod).
+
+*******************************************************************************
+
+# trt2import
+trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBabel](http://www.gpsbabel.org/)) to aid in copying and converting FIT files from a Timex Run Trainer 2.0 using a Windows PC.
+
+## Summary
+    usage: trt2import [-h] [-v] [-o] [-t] [-g] [-d] [-s] [-c] [-p]
+                      [-f CALIBRATION_FACTOR]
+                      drive folder
+
+    positional arguments:
+      drive                 Drive letter for the watch USB device
+      folder                Root folder for storing copied/converted files
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -v, --version         show program's version number and exit
+      -o, --overwrite       Force overwriting existing file
+                            (default: don't overwrite)
+      -t, --convert_to_tcx  Also convert to TCX
+      -g, --convert_to_gpx  Also convert to GPX (requires GPSBabel, implies -t)
+      -d, --recalculate-distance
+                            Recalculate distance from GPS for TCX and GPX
+      -s, --recalculate-speed
+                            Recalculate speed from GPS for TCX and GPX
+      -c, --calibrate-footpod
+                            Use GPS-measured and/or known distance to calibrate
+                            footpod data for TCX and GPX
+      -p, --per-lap-calibration
+                            Apply footpod calibration on a per lap basis for TCX
+                            and GPX (default: apply calibration per activity)
+      -f CALIBRATION_FACTOR, --calibration-factor CALIBRATION_FACTOR
+                            Override watch calibration factor
+                            (default: read current factor from watch)
+
+
+## Options
+* `drive` should be a Windows drive letter such as `E:\` (or `E:` or just `E`) representing the Timex Run Trainer 2.0 USB device.
+
+* `folder` is where the FIT files will be copied to. Files will be renamed according to the date of the activity, and a folder hierarchy will be created inside the given folder for years (when the FIT file was created) and file type, e.g. `<folder>\2015\FIT\2015-11-28_1430.FIT`
+
+* `--overwrite`
+If a file already exists at the target destination for a given FIT file on the watch, it won't be imported. Use this option to override that and copy regardless of existing files.
+
+* `--convert_to_tcx`  Also convert the FIT file to TCX, stored at `<folder>\<year>\TCX\<filename>.tcx`
+
+* `--convert_to_gpx`  Also convert to GPX (stored at `<folder>\<year>\GPX\<filename>.gpx`). This requires [GPSBabel](http://www.gpsbabel.org/) to be installed and available on %PATH%. The GPX is produced from the TCX, so this option also implies `-t` above.
+
+* `--recalculate-distance` See fit2tcx (above) - only applies to TCX and GPX conversion
+
+* `--recalculate-speed` See fit2tcx (above) - only applies to TCX and GPX conversion
+
+* `--calibrate-footpod` See fit2tcx (above) - only applies to TCX and GPX conversion
+
+* `--per-lap-calibration` See fit2tcx (above) - only applies to TCX and GPX conversion
+
+* `--calibration-factor CALIBRATION_FACTOR` See fit2tcx (above) - only applies to TCX and GPX conversion
+
+
+## Notes
+### Calibration factor
+Options set for trt2import apply to the whole import operation, which might involve multiple FIT files. e.g. whether the footpod calibration factor is read from the watch or manually specified, it applies to all the FIT files imported at that time. If individual FIT files were recorded with different factors, this will therefore not be correct.
+
+### Default Programs Editor
+The most useful application of trt2import is in conjunction with [Default Programs Editor](http://www.defaultprogramseditor.com/), where an autoplay handler can be set up for use with unknown USB devices, enabling one-click import and conversion of FIT files when the Timex Run Trainer 2.0 is connected to the PC.

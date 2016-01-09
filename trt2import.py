@@ -1,15 +1,30 @@
 #!/usr/bin/env python
 #
-# Copy & convert FIT files from Timex Run Trainer 2.0
+# trt2import - copy & convert FIT files from a Timex Run Trainer 2.0
 #
+# Copyright (c) 2014-2016, Ian Grant <ian@iangrant.me> [https://github.com/imgrant/fit2tcx]
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 
 from __future__ import print_function, division
 import sys
 import os
-from win32api import *
-from win32gui import *
-import win32con
-import time
 import argparse
 import string
 import glob
@@ -21,67 +36,10 @@ import fit2tcx
 
 __prog__ = "trt2import"
 __desc__ = "Timex Run Trainer 2.0 FIT file importer"
-__version__ = "2.0"
-
-
-class WindowsBalloonTip:
-    def __init__(self, title, msg):
-        message_map = { win32con.WM_DESTROY: self.OnDestroy, }
-        # Register the Window class.
-        wc = WNDCLASS()
-        hinst = wc.hInstance = GetModuleHandle(None)
-        wc.lpszClassName = "PythonTaskbar"
-        wc.lpfnWndProc = message_map # could also specify a wndproc.
-        classAtom = RegisterClass(wc)
-        # Create the Window.
-        style = win32con.WS_OVERLAPPED | win32con.WS_SYSMENU
-        self.hwnd = CreateWindow( classAtom, "Taskbar", style, \
-                0, 0, win32con.CW_USEDEFAULT, win32con.CW_USEDEFAULT, \
-                0, 0, hinst, None)
-        UpdateWindow(self.hwnd)
-        # Icon management.
-        iconPathName = os.path.abspath(os.path.join(sys.path[0], __prog__+".ico" ))
-        icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
-        try:
-           hicon = LoadImage(hinst, iconPathName, \
-                    win32con.IMAGE_ICON, 0, 0, icon_flags)
-        except:
-            # hicon = LoadIcon(0, win32con.IDI_APPLICATION)
-            hicon = ExtractIcon(0, sys.executable, 0)
-        flags = NIF_ICON | NIF_MESSAGE | NIF_TIP
-        nid = (self.hwnd, 0, flags, win32con.WM_USER+20, hicon, "tooltip")
-        # Notify
-        Shell_NotifyIcon(NIM_ADD, nid)
-        Shell_NotifyIcon(NIM_MODIFY, \
-                         (self.hwnd, 0, NIF_INFO, win32con.WM_USER+20,\
-                          hicon, "Balloon  tooltip",msg,200,title))
-        # self.show_balloon(title, msg)
-        time.sleep(4)
-        # Destroy
-        DestroyWindow(self.hwnd)
-        classAtom = UnregisterClass(classAtom, hinst)
-
-    def OnDestroy(self, hwnd, msg, wparam, lparam):
-        nid = (self.hwnd, 0)
-        Shell_NotifyIcon(NIM_DELETE, nid)
-        PostQuitMessage(0) # Terminate the app.
-
-
-class ToolTipOut():
-    def __init__(self):
-        pass
-    def write(self, string):
-        msg = string.strip()
-        WindowsBalloonTip(__desc__, msg)
-    def flush(self):
-        pass
+__version__ = "3.0"
 
 
 def main():
-    if ( os.path.basename(sys.executable) == "pythonw.exe" or
-    os.path.basename(sys.executable) == "trt2import.exe" ):
-        sys.stdout = ToolTipOut()
-        sys.stderr = ToolTipOut()
     try:
         parser = argparse.ArgumentParser(prog=__prog__)
         parser.add_argument("drive", help="Drive letter for the watch USB device")
@@ -94,19 +52,19 @@ def main():
             action="store_true", default=False, help="Force overwriting existing files (default: don't overwrite)")
         parser.add_argument(
             "-t", "--convert_to_tcx",
-            action="store_true", default=False, help="Also convert to TCX (default: don't convert to TCX)")
+            action="store_true", default=False, help="Also convert to TCX")
         parser.add_argument(
             "-g", "--convert_to_gpx",
-            action="store_true", default=False, help="Also convert to GPX (requires GPSBabel, implies -t, default: don't convert to GPX)")
+            action="store_true", default=False, help="Also convert to GPX (requires GPSBabel, implies -t)")
         parser.add_argument(
             "-d", "--recalculate-distance",
-            action="store_true", default=False, help="Recalculate distance from GPS for TCX and GPX (default: don't recalculate)")
+            action="store_true", default=False, help="Recalculate distance from GPS for TCX and GPX")
         parser.add_argument(
             "-s", "--recalculate-speed",
-            action="store_true", default=False, help="Recalculate speed from GPS for TCX and GPX (default: don't recalculate)")
+            action="store_true", default=False, help="Recalculate speed from GPS for TCX and GPX")
         parser.add_argument(
             "-c", "--calibrate-footpod",
-            action="store_true", default=False, help="Use GPS-measured and/or known distance to calibrate footpod data for TCX and GPX (default: calibrate footpod)")
+            action="store_true", default=False, help="Use GPS-measured and/or known distance to calibrate footpod data for TCX and GPX")
         parser.add_argument(
             "-p", "--per-lap-calibration",
             action="store_true", default=False, help="Apply footpod calibration on a per lap basis for TCX and GPX (default: apply calibration per activity)")
@@ -122,7 +80,7 @@ def main():
         print(e)
         return 1
     else:
-    	# Check the drive for ACTIVITY folder and FIT files
+        # Check the drive for ACTIVITY folder and FIT files
         DRIVE_LETTER = args.drive[:1]
         if not os.path.exists(DRIVE_LETTER + ":\\ACTIVITY"):
             print("No ACTIVITY folder found - is drive "+DRIVE_LETTER+" a Timex Run Trainer 2.0?")

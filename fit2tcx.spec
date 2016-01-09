@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['fit2tcx.py'],
-             pathex=['C:\\Users\\igrant\\Documents\\GitHub\\fit2tcx'],
+             pathex=['.'],
              binaries=None,
              datas=[(r'C:\Anaconda3\Lib\site-packages\tzwhere\tz_world_compact.json', 'tzwhere')],
              hiddenimports=[],
@@ -25,4 +25,5 @@ exe = EXE(pyz,
           debug=False,
           strip=None,
           upx=True,
-          console=True )
+          console=True,
+          icon='ant.ico' )

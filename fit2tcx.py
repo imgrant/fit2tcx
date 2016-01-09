@@ -3,7 +3,7 @@
 # fit2tcx - convert a FIT file to a TCX file
 #
 # Copyright (c) 2012, Gustav Tiger <gustav@tiger.name> [https://github.com/Tigge/FIT-to-TCX/]
-# Copyright (c) 2014-2015, Ian Grant <ian@iangrant.me> [https://github.com/imgrant/fit2tcx]
+# Copyright (c) 2014-2016, Ian Grant <ian@iangrant.me> [https://github.com/imgrant/fit2tcx]
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
