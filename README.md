@@ -72,8 +72,8 @@ Note that even if the `-d` or `-c` arguments are not given, information about GP
 trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBabel](http://www.gpsbabel.org/)) to aid in copying and converting FIT files from a Timex Run Trainer 2.0 using a Windows PC.
 
 ## Summary
-    usage: trt2import [-h] [-v] [-o] [-t] [-g] [-d] [-s] [-c] [-p]
-                      [-f CALIBRATION_FACTOR]
+    usage: trt2import [-h] [-v] [-o] [-t] [-g] [-u] [-n USERNAME] [-p PASSWORD]
+                      [-d] [-s] [-c] [-l] [-f CALIBRATION_FACTOR]
                       drive folder
 
     positional arguments:
@@ -87,6 +87,12 @@ trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBa
                             (default: don't overwrite)
       -t, --convert_to_tcx  Also convert to TCX
       -g, --convert_to_gpx  Also convert to GPX (requires GPSBabel, implies -t)
+      -u, --upload-to-gc    Also upload the activity to Garmin Connect (uses TCX,
+                            implies -t)
+      -n USERNAME, --username USERNAME
+                            Username for Garmin Connect
+      -p PASSWORD, --password PASSWORD
+                            Password for Garmin Connect
       -d, --recalculate-distance
                             Recalculate distance from GPS for TCX and GPX
       -s, --recalculate-speed
@@ -94,7 +100,7 @@ trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBa
       -c, --calibrate-footpod
                             Use GPS-measured and/or known distance to calibrate
                             footpod data for TCX and GPX
-      -p, --per-lap-calibration
+      -l, --per-lap-calibration
                             Apply footpod calibration on a per lap basis for TCX
                             and GPX (default: apply calibration per activity)
       -f CALIBRATION_FACTOR, --calibration-factor CALIBRATION_FACTOR
@@ -114,6 +120,8 @@ If a file already exists at the target destination for a given FIT file on the w
 
 * `--convert_to_gpx`  Also convert to GPX (stored at `<folder>\<year>\GPX\<filename>.gpx`). This requires [GPSBabel](http://www.gpsbabel.org/) to be installed and available on %PATH%. The GPX is produced from the TCX, so this option also implies `-t` above.
 
+* `--upload-to-gc`  Also upload the activity to Garmin Connect. This uses the converted TCX file and so implies `-t` (above). Specify the username and password for the Garmin Connect account with the `-n` and `-p` options.
+
 * `--recalculate-distance` See fit2tcx (above) - only applies to TCX and GPX conversion
 
 * `--recalculate-speed` See fit2tcx (above) - only applies to TCX and GPX conversion
@@ -122,7 +130,7 @@ If a file already exists at the target destination for a given FIT file on the w
 
 * `--per-lap-calibration` See fit2tcx (above) - only applies to TCX and GPX conversion
 
-* `--calibration-factor CALIBRATION_FACTOR` See fit2tcx (above) - only applies to TCX and GPX conversion
+* `--calibration-factor CALIBRATION_FACTOR` See fit2tcx (above, note different short option letter) - only applies to TCX and GPX conversion
 
 
 ## Notes
