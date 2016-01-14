@@ -85,8 +85,8 @@ trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBa
       -v, --version         show program's version number and exit
       -o, --overwrite       Force overwriting existing file
                             (default: don't overwrite)
-      -t, --convert_to_tcx  Also convert to TCX
-      -g, --convert_to_gpx  Also convert to GPX (requires GPSBabel, implies -t)
+      -t, --convert-to-tcx  Also convert to TCX
+      -g, --convert-to-gpx  Also convert to GPX (requires GPSBabel, implies -t)
       -u, --upload-to-gc    Also upload the activity to Garmin Connect (uses TCX,
                             implies -t)
       -n USERNAME, --username USERNAME
