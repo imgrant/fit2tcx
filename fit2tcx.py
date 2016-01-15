@@ -23,10 +23,9 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 import sys
-import os
 import copy
 import contextlib
 import argparse
@@ -73,8 +72,72 @@ INTENSITY_MAP = {
     None:       "Active"}
 
 PRODUCT_MAP = {
-    0:      "IpBike",
-    255:    "Run Trainer 2.0"}
+    0:      "Unknown",
+    255:    "Run Trainer 2.0",      # Timex
+    # Garmin products:
+    1:      "Garmin Connect API",   # Also HRM1
+    2:      "AXH01",
+    2:      "AXH01",
+    4:      "AXB02",
+    5:      "HRM2SS",
+    6:      "DSI_ALF02",
+    473:    "Forerunner 301",
+    474:    "Forerunner 301",
+    475:    "Forerunner 301",
+    494:    "Forerunner 301",
+    717:    "Forerunner 405",
+    987:    "Forerunner 405",
+    782:	"Forerunner 50",
+    988:	"Forerunner 60",
+    1011:	"DSI_ALF01",
+    1018:   "Forerunner 310XT",
+    1446:   "Forerunner 310XT",
+    1036:   "Edge 500",
+    1199:   "Edge 500",
+    1213:   "Edge 500",
+    1387:   "Edge 500",
+    1422:   "Edge 500",
+    1124:   "Forerunner 110",
+    1274:   "Forerunner 110",
+    1169:	"Edge 800",
+    1333:	"Edge 800",
+    1334:	"Edge 800",
+    1497:	"Edge 800",
+    1386:	"Edge 800",
+    1253:	"Chirp",
+    1325:	"Edge 200",
+    1555:	"Edge 200",
+    1328:	"Forerunner 910XT",
+    1537:	"Forerunner 910XT",
+    1600:	"Forerunner 910XT",
+    1664:	"Forerunner 910XT",
+    1765:	"Forerunner 920XT",
+    1341:	"ALF04",
+    1345:	"Forerunner 610",
+    1410:	"Forerunner 610",
+    1360:	"Forerunner 210", 
+    1436:	"Forerunner 70",
+    1461:	"AMX",
+    1482:	"Forerunner 10",
+    1688:	"Forerunner 10",
+    1499:	"Swim",
+    1551:	"Fenix",
+    1967:	"Fenix 2",
+    1561:	"Edge 510",
+    1742:	"Edge 510",
+    1821:	"Edge 510",
+    1567:	"Edge 810",
+    1721:	"Edge 810",
+    1822:	"Edge 810",
+    1823:	"Edge 810",
+    1836:	"Edge 1000",
+    1570:	"Tempe",
+    1735:	"VIRB Elite", 
+    1736:	"Edge Touring",
+    1752:	"HRM Run",
+    10007:	"SDM4",
+    20119:	"Training Center",
+    1623:	"Forerunner 620"}
 
 
 """
@@ -289,15 +352,17 @@ def add_author(document):
     create_sub_element(author, "PartNumber", "000-00000-00")
 
 
-def add_creator(element, manufacturer, productID, serial):
+def add_creator(element, manufacturer, product_name, product_id, serial):
     """Add creator element (recording device) to TCX activity"""
     creator = create_sub_element(element, "Creator")
     creator.set(XML_SCHEMA + "type", "Device_t")
-    product = PRODUCT_MAP[productID] if productID in PRODUCT_MAP else ProductID
-    create_sub_element(creator, "Name", manufacturer + " " + product)
+    create_sub_element(creator, "Name", manufacturer + " " + product_name)
     unitID = int(serial or 0)
     create_sub_element(creator, "UnitId", str(unitID))
-    create_sub_element(creator, "ProductID", "0")
+    # Set ProductID to 0 for non-Garmin devices
+    if manufacturer != "Garmin":
+        product_id = 0
+    create_sub_element(creator, "ProductID", str(product_id))
     version = create_sub_element(creator, "Version")
     create_sub_element(version, "VersionMajor", "0")
     create_sub_element(version, "VersionMinor", "0")
@@ -376,7 +441,7 @@ def add_lap(element,
     # extra fake/empty laps in FIT files from the Timex Run Trainer 2.0
     if lap.get_value('timestamp') is not None:
 
-        lap_num = lap.get_value("wkt_step_index")
+        lap_num = lap.get_value("message_index") + 1
 
         start_time = lap.get_value("start_time")
         end_time = lap.get_value("timestamp")
@@ -768,6 +833,11 @@ def convert(filename,
             current_cal_factor=100.0):
     """Convert a FIT file to TCX format"""
 
+    # Calibration requires either GPS recalculation or manual lap distance(s):
+    if calibrate and not dist_recalc and manual_lap_distance is None:
+        sys.stderr.write("Calibration requested, enabling distance recalculation from GPS.\n")
+        dist_recalc = True
+
     # Calibration with manual lap distances implies
     # per-lap calibration:
     if calibrate and manual_lap_distance is not None:
@@ -815,7 +885,7 @@ def convert(filename,
     except FitParseError as e:
         sys.stderr.write(str("Error while parsing .FIT file: %s" % e) + "\n")
         sys.exit(1)
-
+    
     if dist_recalc:
         distance_used = total_calculated_distance
     elif calibrate:
@@ -840,7 +910,7 @@ def convert(filename,
             parts.append("speed recalculated")
 
         if calibrate and manual_lap_distance is not None:
-            reference = " from known distance and/or GPS"
+            reference = " from known distance (with GPS fill-in)"
         elif dist_recalc or speed_recalc:
             reference = " from GPS"
 
@@ -865,10 +935,23 @@ def convert(filename,
                       new_cf=new_cal_factor,
                       dist_method=method)
     add_notes(actelem, notes)
+    try:
+        dinfo = next(activity.get_messages('device_info'))
+        manufacturer = dinfo.get_value('manufacturer').title().replace('_', ' ')
+        product_name = dinfo.get_value('descriptor').replace('_', ' ')
+        product_id = dinfo.get_value('product')
+        serial_number = dinfo.get_value('serial_number')
+    except: # if no device_info message, StopIteration is thrown
+        fid = next(activity.get_messages('file_id'))
+        manufacturer = fid.get_value('manufacturer').title().replace('_', ' ')
+        product_id = fid.get_value('product')
+        product_name = PRODUCT_MAP[product_id] if product_id in PRODUCT_MAP else product_id
+        serial_number = fid.get_value('serial_number')
     add_creator(actelem,
-                activity.messages[0].get_value('manufacturer').capitalize(),
-                activity.messages[0].get_value('product'),
-                activity.messages[0].get_value('serial_number')
+                manufacturer,
+                product_name,
+                product_id,
+                serial_number
                 )
     add_author(document)
     return document
@@ -927,6 +1010,12 @@ def main():
         help="Existing calibration factor (defaults to 100.0)")
 
     args = parser.parse_args()
+
+    if (args.calibrate_footpod and 
+        not args.recalculate_distance_from_gps and 
+        not args.manual_lap_distance):
+        parser.error("-c (--calibrate-footpod) requires either -d (--recalculate-distance-from-gps) or -l (--manual-lap-distance)")
+        return 1
 
     try:
         document = convert(args.FitFile,

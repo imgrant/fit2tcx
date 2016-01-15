@@ -8,6 +8,17 @@ fit2tcx aims to be the most complete FTI to TCX converter for this situation; it
 Additional functions are provided for recalculating/recalibrating stored speed and distance data from the GPS track in the case where a footpod was used, or manually specifying known distances and rescaling the data accordingly.
 
 
+## Requirements
+The following python modules are required by fit2tcx:
+* [lxml](http://lxml.de/)
+* [pytz](http://pytz.sourceforge.net/)
+* [tzwhere](https://pypi.python.org/pypi/tzwhere/)
+* [geopy](https://github.com/geopy/geopy)
+* [fitparse](http://dtcooper.github.io/python-fitparse/) - recommended is either [dtcooper/python-fitparse](https://github.com/dtcooper/python-fitparse) ('ng' branch), for python 2.5, or [kropp/python-fitparse](https://github.com/kropp/python-fitparse) ('python3' branch), for python 3.
+
+The first four should be readily available via easy_install or pip. The version of fitparse available via pip might be out of date.
+
+
 ## Summary
     usage: fit2tcx [-h] [-v] [-t] [-d] [-s] [-c] [-p] [-l MANUAL_LAP_DISTANCE]
                    [-f CALIBRATION_FACTOR]
@@ -36,6 +47,7 @@ Additional functions are provided for recalculating/recalibrating stored speed a
                             metres, use calibration to apply)
       -f CALIBRATION_FACTOR, --calibration-factor CALIBRATION_FACTOR
                             Existing calibration factor (defaults to 100.0)
+
 
 ## Options
 * `--local-timezone`
@@ -66,10 +78,19 @@ The `-c (--calibrate-footpod)` option can be used with the `-d (--recalculate-di
 
 Note that even if the `-d` or `-c` arguments are not given, information about GPS-recorded distance and footpod accuracy is recorded in the notes for each lap and the activity overall (the values are, of course, not used to change the actual data in the TCX file in the arguments aren't given), allowing you to compare. In the event that the FIT file was recorded using GPS data, the values will be the same and the footpod accuracy will be 100.0% (i.e. fit2tcx assumes that the distance reported by the FIT file comes from a footpod).
 
+
 *******************************************************************************
 
+
 # trt2import
-trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBabel](http://www.gpsbabel.org/)) to aid in copying and converting FIT files from a Timex Run Trainer 2.0 using a Windows PC.
+trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBabel](http://www.gpsbabel.org/)) to aid in copying and converting FIT files from a Timex Run Trainer 2.0.
+
+
+## Requirements
+The following python modules are required by trt2import:
+* fit2tcx and associated requirements (see above)
+* [UploadGarmin](http://sourceforge.net/projects/gcpuploader/) - available via pip as 'GcpUploader'
+
 
 ## Summary
     usage: trt2import [-h] [-v] [-o] [-t] [-g] [-u] [-n USERNAME] [-p PASSWORD]
@@ -77,7 +98,7 @@ trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBa
                       drive folder
 
     positional arguments:
-      drive                 Drive letter for the watch USB device
+      drive                 Drive or root path to the watch USB device
       folder                Root folder for storing copied/converted files
 
     optional arguments:
@@ -91,7 +112,7 @@ trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBa
                             implies -t)
       -n USERNAME, --username USERNAME
                             Username for Garmin Connect
-      -p PASSWORD, --password PASSWORD
+      -w PASSWORD, --password PASSWORD
                             Password for Garmin Connect
       -d, --recalculate-distance
                             Recalculate distance from GPS for TCX and GPX
@@ -100,7 +121,7 @@ trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBa
       -c, --calibrate-footpod
                             Use GPS-measured and/or known distance to calibrate
                             footpod data for TCX and GPX
-      -l, --per-lap-calibration
+      -p, --per-lap-calibration
                             Apply footpod calibration on a per lap basis for TCX
                             and GPX (default: apply calibration per activity)
       -f CALIBRATION_FACTOR, --calibration-factor CALIBRATION_FACTOR
@@ -109,18 +130,18 @@ trt2import is a companion program that leverages fit2tcx (and optionally, [GPSBa
 
 
 ## Options
-* `drive` should be a Windows drive letter such as `E:\` (or `E:` or just `E`) representing the Timex Run Trainer 2.0 USB device.
+* `drive` can be a Windows drive letter such as `E:\` or a *nix mount point such as `/media/usb` representing the Timex Run Trainer 2.0 USB device.
 
-* `folder` is where the FIT files will be copied to. Files will be renamed according to the date of the activity, and a folder hierarchy will be created inside the given folder for years (when the FIT file was created) and file type, e.g. `<folder>\2015\FIT\2015-11-28_1430.FIT`
+* `folder` is where the FIT files will be copied to. Files will be renamed according to the date of the activity, and a folder hierarchy will be created inside the given folder for years (when the FIT file was created) and file type, e.g. `<folder>/2015/FIT/2015-11-28_1430.fit`
 
 * `--overwrite`
 If a file already exists at the target destination for a given FIT file on the watch, it won't be imported. Use this option to override that and copy regardless of existing files.
 
-* `--convert_to_tcx`  Also convert the FIT file to TCX, stored at `<folder>\<year>\TCX\<filename>.tcx`
+* `--convert_to_tcx`  Also convert the FIT file to TCX, stored at `<folder>/<year>/TCX/<filename>.tcx`
 
-* `--convert_to_gpx`  Also convert to GPX (stored at `<folder>\<year>\GPX\<filename>.gpx`). This requires [GPSBabel](http://www.gpsbabel.org/) to be installed and available on %PATH%. The GPX is produced from the TCX, so this option also implies `-t` above.
+* `--convert_to_gpx`  Also convert to GPX (stored at `<folder>/<year>/GPX/<filename>.gpx`). This requires [GPSBabel](http://www.gpsbabel.org/) to be installed and available on %PATH%/$PATH. The GPX is produced from the TCX, so this option also implies `-t` above.
 
-* `--upload-to-gc`  Also upload the activity to Garmin Connect. This uses the converted TCX file and so implies `-t` (above). Specify the username and password for the Garmin Connect account with the `-n` and `-p` options.
+* `--upload-to-gc`  Also upload the activity to Garmin Connect. This uses the converted TCX file and so implies `-t` (above). Specify the username and password for the Garmin Connect account with the `-n` and `-w` options.
 
 * `--recalculate-distance` See fit2tcx (above) - only applies to TCX and GPX conversion
 
@@ -130,7 +151,7 @@ If a file already exists at the target destination for a given FIT file on the w
 
 * `--per-lap-calibration` See fit2tcx (above) - only applies to TCX and GPX conversion
 
-* `--calibration-factor CALIBRATION_FACTOR` See fit2tcx (above, note different short option letter) - only applies to TCX and GPX conversion
+* `--calibration-factor CALIBRATION_FACTOR` See fit2tcx - only applies to TCX and GPX conversion
 
 
 ## Notes
@@ -138,4 +159,4 @@ If a file already exists at the target destination for a given FIT file on the w
 Options set for trt2import apply to the whole import operation, which might involve multiple FIT files. e.g. whether the footpod calibration factor is read from the watch or manually specified, it applies to all the FIT files imported at that time. If individual FIT files were recorded with different factors, this will therefore not be correct.
 
 ### Default Programs Editor
-The most useful application of trt2import is in conjunction with [Default Programs Editor](http://www.defaultprogramseditor.com/), where an autoplay handler can be set up for use with unknown USB devices, enabling one-click import and conversion of FIT files when the Timex Run Trainer 2.0 is connected to the PC.
+A useful application of trt2import is on Windows, in conjunction with [Default Programs Editor](http://www.defaultprogramseditor.com/), where an autoplay handler can be set up for use with unknown USB devices, enabling one-click import and conversion of FIT files and upload to Garmin Connect when the Timex Run Trainer 2.0 is connected to the PC.

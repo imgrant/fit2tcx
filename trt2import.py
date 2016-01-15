@@ -38,13 +38,13 @@ import UploadGarmin
 
 __prog__ = "trt2import"
 __desc__ = "Timex Run Trainer 2.0 FIT file importer"
-__version__ = "4.0"
+__version__ = "4.1"
 
 
 def main():
     try:
         parser = argparse.ArgumentParser(prog=__prog__)
-        parser.add_argument("drive", help="Drive letter for the watch USB device")
+        parser.add_argument("drive", help="Drive letter or root path for the watch USB drive")
         parser.add_argument("folder", help="Root folder for storing copied/converted files")
         parser.add_argument(
             "-v", "--version", action='version',
@@ -65,7 +65,7 @@ def main():
             "-n", "--username",
             action="store", help="Username for Garmin Connect")
         parser.add_argument(
-            "-p", "--password",
+            "-w", "--password",
             action="store", help="Password for Garmin Connect")
         parser.add_argument(
             "-d", "--recalculate-distance",
@@ -77,13 +77,18 @@ def main():
             "-c", "--calibrate-footpod",
             action="store_true", default=False, help="Use GPS-measured and/or known distance to calibrate footpod data for TCX and GPX")
         parser.add_argument(
-            "-l", "--per-lap-calibration",
+            "-p", "--per-lap-calibration",
             action="store_true", default=False, help="Apply footpod calibration on a per lap basis for TCX and GPX (default: apply calibration per activity)")
         parser.add_argument(
             "-f", "--calibration-factor",
             action="store", default=-1, type=float,
             help="Override watch calibration factor (default: read current factor from watch)")
         args = parser.parse_args()
+
+        if (args.calibrate_footpod and 
+            not args.recalculate_distance):
+            parser.error("-c (--calibrate-footpod) requires -d (--recalculate-distance)")
+            return 1
 
         # GPX conversion requires TCX, so make sure it's set if applicable:
         if args.convert_to_gpx:
@@ -93,10 +98,10 @@ def main():
         if args.upload_to_gc:
             args.convert_to_tcx = True
             if args.username is None:
-                print("Error: username for upload to Garmin Connect was not specified.")
+                parser.error("-u (--upload-to-gc) was requested, but a username was not specified with -n (--username)")
                 return 1
             if args.password is None:
-                print("Error: password for upload to Garmin Connect was not specified.")
+                parser.error("-u (--upload-to-gc) was requested, but a password was not specified with -w (--password)")
                 return 1
 
     except Exception as e:
@@ -106,12 +111,12 @@ def main():
     else:
 
         # Check the drive for ACTIVITY folder and FIT files
-        DRIVE_LETTER = args.drive[:1]
-        if not os.path.exists(DRIVE_LETTER + ":\\ACTIVITY"):
-            print("No ACTIVITY folder found - is drive "+DRIVE_LETTER+" a Timex Run Trainer 2.0?")
+        activity_folder = os.path.join(args.drive, "ACTIVITY")
+        if not os.path.exists(activity_folder):
+            print("No ACTIVITY folder found - is "+args.drive+" a Timex Run Trainer 2.0?")
             return 1
 
-        fitFiles = glob.glob(DRIVE_LETTER + ":\\ACTIVITY\\*\\*.FIT")
+        fitFiles = glob.glob(os.path.join(activity_folder, "*", "*.FIT"))
         numFitFiles = len(fitFiles)
         if not numFitFiles >= 1:
             print("No activities found")
@@ -129,7 +134,8 @@ def main():
         else:
         # Get the current calibration factor from the watch
             try:
-                settings = open(DRIVE_LETTER + ":\\SETTINGS\\M255-1.SET", mode="rb").read()
+                settings_file = os.path.join(args.drive, "SETTINGS", "M255-1.SET")
+                settings = open(settings_file, mode="rb").read()
                 watch_cal_factor = struct.unpack("h", settings[4:6])[0] / 10
                 print("Calibration factor read from watch: "
                       "{cf:.1f}%".format(cf=watch_cal_factor))
@@ -154,17 +160,18 @@ def main():
 
         # Process FIT files on watch
         for srcFit in fitFiles:
-            (letter, activity, date, filename) = srcFit.split("\\")
+            (path, filename) = os.path.split(srcFit)
+            date = os.path.basename(os.path.normpath(path))
             year    = date[0:4]
             month   = date[4:6]
             day     = date[6:8]
             hourmin = filename[0:4]
             basename = "-".join([year, month, day]) + "_" + hourmin
 
-            dstYearFolder = args.folder + "\\" + year
-            dstFitFolder = dstYearFolder + "\\" + "FIT"
-            dstTcxFolder = dstYearFolder + "\\" + "TCX"
-            dstGpxFolder = dstYearFolder + "\\" + "GPX"
+            dstYearFolder = os.path.join(args.folder, year)
+            dstFitFolder = os.path.join(dstYearFolder, "FIT")
+            dstTcxFolder = os.path.join(dstYearFolder, "TCX")
+            dstGpxFolder = os.path.join(dstYearFolder, "GPX")
 
             # Create destination folders if needed:
             if not os.path.exists(dstFitFolder):
@@ -174,9 +181,9 @@ def main():
             if not os.path.exists(dstGpxFolder) and args.convert_to_gpx:
                 os.makedirs(dstGpxFolder)
 
-            dstFit  = dstFitFolder + "\\" + basename + ".FIT"
-            dstTcx  = dstTcxFolder + "\\" + basename + ".tcx"
-            dstGpx  = dstGpxFolder + "\\" + basename + ".gpx"
+            dstFit  = os.path.join(dstFitFolder, basename + ".fit")
+            dstTcx  = os.path.join(dstTcxFolder, basename + ".tcx")
+            dstGpx  = os.path.join(dstGpxFolder, basename + ".gpx")
 
             print()
 
@@ -196,7 +203,7 @@ def main():
                     print("Error: unable to copy FIT file '{file!s}'. ({err!s})".format(
                         file=os.path.basename(srcFit),
                         err=e))
-                    overallReturnCode = 1
+                    overallReturnCode = 2
 
                 # Convert to TCX
                 if args.convert_to_tcx:
@@ -222,7 +229,7 @@ def main():
                         print("Error: unable to convert FIT file '{file!s}' to TCX. ({err!s})".format(
                             file=os.path.basename(srcFit),
                             err=e))
-                        overallReturnCode = 1
+                        overallReturnCode = 2
 
                 # Convert to GPX (via external call to GPSBabel)
                 if args.convert_to_gpx:
@@ -236,9 +243,13 @@ def main():
                         print("Converted GPX file saved to {path!s}".format(path=dstGpx))
                     except Exception as e:
                         print("Error: unable to convert TCX file '{file!s}' to GPX. ({err!s})".format(file=os.path.basename(dstTcx), err=e))
-                        overallReturnCode = 1
+                        overallReturnCode = 2
 
                 # Upload to Garmin Connect
+                # N.B. Uploads seem to work, but cause an internal server error (status code 500),
+                # so we don't get confirmation. Also, the uploaded activities don't sync to other
+                # platforms (e.g. Strava), not sure if this is related to the 500 error or not.
+                # Uploading the file manually to GC works without error and triggers the sync.
                 if args.upload_to_gc:
                     try:
                         status, id_msg = gc.upload_file(dstTcx)
@@ -250,20 +261,20 @@ def main():
                             raise Exception(id_msg)
                     except Exception as e:
                         print("Error: unable to upload TCX file to Garmin Connect. ({err!s})".format(err=e))
-                        overallReturnCode = 1
+                        overallReturnCode = 2
 
         if numImported == 1:
-            iNoun = "activity"
+            noun = "activity"
         else:
-            iNoun = "activities"
-        print("\nAll done! "+str(numFitFiles)+" "+noun+" processed, "+str(numImported)+" new "+iNoun+" imported.")
+            noun = "activities"
+        print("\nAll done! "+str(numImported)+" new "+noun+" imported.")
 
         return overallReturnCode
 
 
 if __name__ == "__main__":
     res = main()
-    if res != 0:
+    if res > 1:
         print("Some errors were encountered. See above for details.")
     input("\nPress Enter to exit ...")
     sys.exit(res)
