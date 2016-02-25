@@ -85,7 +85,7 @@ def main():
             help="Override watch calibration factor (default: read current factor from watch)")
         args = parser.parse_args()
 
-        if (args.calibrate_footpod and 
+        if (args.calibrate_footpod and
             not args.recalculate_distance):
             parser.error("-c (--calibrate-footpod) requires -d (--recalculate-distance)")
             return 1
@@ -147,7 +147,7 @@ def main():
         if args.upload_to_gc:
             # Create GC upload object
             gc = UploadGarmin.UploadGarmin()
-            
+
             # LOGIN
             if not gc.login(args.username, args.password):
               print("Garmin Connect login failed - please verify your login credentials")
@@ -160,6 +160,11 @@ def main():
 
         # Process FIT files on watch
         for srcFit in fitFiles:
+
+            print()
+            print("Processing activity '{file!s}'...".format(
+                file=os.path.basename(srcFit)))
+
             (path, filename) = os.path.split(srcFit)
             date = os.path.basename(os.path.normpath(path))
             year    = date[0:4]
@@ -185,23 +190,18 @@ def main():
             dstTcx  = os.path.join(dstTcxFolder, basename + ".tcx")
             dstGpx  = os.path.join(dstGpxFolder, basename + ".gpx")
 
-            print()
-
             if os.path.exists(dstFit) and not args.overwrite:
-                print("FIT file '{file!s}' has already been imported, skipping".format(
-                    file=os.path.basename(srcFit)))
-            else:
+                print("This activity has previously been imported, skipping")
 
+            else:
                 # Copy the FIT file
                 try:
                     shutil.copy2(srcFit, dstFit)
                     numImported += 1
-                    print("FIT file '{file!s}' copied to {path!s}".format(
-                        file=os.path.basename(srcFit),
+                    print("FIT file copied to {path!s}".format(
                         path=dstFit))
                 except IOError as e:
-                    print("Error: unable to copy FIT file '{file!s}'. ({err!s})".format(
-                        file=os.path.basename(srcFit),
+                    print("Error: unable to copy FIT file. ({err!s})".format(
                         err=e))
                     overallReturnCode = 2
 
@@ -226,8 +226,7 @@ def main():
                         tcxFile.close()
                         print("Converted TCX file saved to {path!s}".format(path=dstTcx))
                     except Exception as e:
-                        print("Error: unable to convert FIT file '{file!s}' to TCX. ({err!s})".format(
-                            file=os.path.basename(srcFit),
+                        print("Error: unable to convert FIT file to TCX. ({err!s})".format(
                             err=e))
                         overallReturnCode = 2
 
@@ -242,7 +241,7 @@ def main():
                                          shell=True)
                         print("Converted GPX file saved to {path!s}".format(path=dstGpx))
                     except Exception as e:
-                        print("Error: unable to convert TCX file '{file!s}' to GPX. ({err!s})".format(file=os.path.basename(dstTcx), err=e))
+                        print("Error: unable to convert TCX file to GPX. ({err!s})".format(err=e))
                         overallReturnCode = 2
 
                 # Upload to Garmin Connect
@@ -254,14 +253,21 @@ def main():
                     try:
                         status, id_msg = gc.upload_file(dstTcx)
                         if status == 'SUCCESS':
-                            print("TCX file successfully uploaded to Garmin Connect. (ID: {id!s})".format(id=id_msg))
+                            print("TCX file successfully uploaded to Garmin Connect. (http://connect.garmin.com/modern/activity/{id!s})".format(id=id_msg))
                         elif status == 'EXISTS':
-                            print("TCX file not uploaded to Garmin Connect, a matching activity already exists. (ID: {id!s})".format(id=id_msg))
+                            print("TCX file not uploaded to Garmin Connect, a matching activity already exists. (http://connect.garmin.com/modern/activity/{id!s})".format(id=id_msg))
                         elif status == 'FAIL':
                             raise Exception(id_msg)
                     except Exception as e:
                         print("Error: unable to upload TCX file to Garmin Connect. ({err!s})".format(err=e))
                         overallReturnCode = 2
+
+                # If we converted to TCX with fit2tcx (above), then we can grab
+                # the notes and print some information about the activity.
+                if args.convert_to_tcx:
+                    activity_notes = document.getroot().findtext(".//{*}Activity/{*}Notes")
+                    if activity_notes is not None:
+                        print("{notes!s}".format(notes=activity_notes))
 
         if numImported == 1:
             noun = "activity"
@@ -278,4 +284,3 @@ if __name__ == "__main__":
         print("Some errors were encountered. See above for details.")
     input("\nPress Enter to exit ...")
     sys.exit(res)
-    

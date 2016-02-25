@@ -115,7 +115,7 @@ PRODUCT_MAP = {
     1341:	"ALF04",
     1345:	"Forerunner 610",
     1410:	"Forerunner 610",
-    1360:	"Forerunner 210", 
+    1360:	"Forerunner 210",
     1436:	"Forerunner 70",
     1461:	"AMX",
     1482:	"Forerunner 10",
@@ -132,7 +132,7 @@ PRODUCT_MAP = {
     1823:	"Edge 810",
     1836:	"Edge 1000",
     1570:	"Tempe",
-    1735:	"VIRB Elite", 
+    1735:	"VIRB Elite",
     1736:	"Edge Touring",
     1752:	"HRM Run",
     10007:	"SDM4",
@@ -885,7 +885,7 @@ def convert(filename,
     except FitParseError as e:
         sys.stderr.write(str("Error while parsing .FIT file: %s" % e) + "\n")
         sys.exit(1)
-    
+
     if dist_recalc:
         distance_used = total_calculated_distance
     elif calibrate:
@@ -1011,8 +1011,8 @@ def main():
 
     args = parser.parse_args()
 
-    if (args.calibrate_footpod and 
-        not args.recalculate_distance_from_gps and 
+    if (args.calibrate_footpod and
+        not args.recalculate_distance_from_gps and
         not args.manual_lap_distance):
         parser.error("-c (--calibrate-footpod) requires either -d (--recalculate-distance-from-gps) or -l (--manual-lap-distance)")
         return 1
@@ -1028,7 +1028,7 @@ def main():
                            args.calibration_factor)
         activity_notes = document.getroot().findtext(".//{*}Activity/{*}Notes")
         if activity_notes is not None:
-            sys.stderr.write(str(activity_notes) + "\n")
+            sys.stdout.write(str(activity_notes) + "\n")
         tcx = open(args.TcxFile, 'wb')
         tcx.write(lxml.etree.tostring(document.getroot(),
                                       pretty_print=True,
