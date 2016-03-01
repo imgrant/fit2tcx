@@ -137,9 +137,9 @@ The following python modules are required by trt2import:
 * `--overwrite`
 If a file already exists at the target destination for a given FIT file on the watch, it won't be imported. Use this option to override that and copy regardless of existing files.
 
-* `--convert_to_tcx`  Also convert the FIT file to TCX, stored at `<folder>/<year>/TCX/<filename>.tcx`
+* `--convert-to-tcx`  Also convert the FIT file to TCX, stored at `<folder>/<year>/TCX/<filename>.tcx`
 
-* `--convert_to_gpx`  Also convert to GPX (stored at `<folder>/<year>/GPX/<filename>.gpx`). This requires [GPSBabel](http://www.gpsbabel.org/) to be installed and available on %PATH%/$PATH. The GPX is produced from the TCX, so this option also implies `-t` above.
+* `--convert-to-gpx`  Also convert to GPX (stored at `<folder>/<year>/GPX/<filename>.gpx`). This requires [GPSBabel](http://www.gpsbabel.org/) to be installed and available on %PATH%/$PATH. The GPX is produced from the TCX, so this option also implies `-t` above.
 
 * `--upload-to-gc`  Also upload the activity to Garmin Connect. This uses the converted TCX file and so implies `-t` (above). Specify the username and password for the Garmin Connect account with the `-n` and `-w` options.
 
