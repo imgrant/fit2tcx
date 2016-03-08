@@ -23,7 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 import sys
 import copy
@@ -455,7 +455,10 @@ def add_lap(element,
         else:
             reference_distance = calculated_distance
 
-        lap_scaling_factor = reference_distance / stored_distance
+        try:
+            lap_scaling_factor = reference_distance / stored_distance
+        except ZeroDivisionError:
+            lap_scaling_factor = 1.00
         if calibrate and per_lap_cal:
             scaling_factor = lap_scaling_factor
         else:
@@ -720,7 +723,7 @@ def add_lap(element,
         #
         # Extensions (AvgSpeed, AvgRunCadence, MaxRunCadence, MaxBikeCadence)
         #
-        if avg_speed or avg_cadence or max_cadence:
+        if not all(var is None for var in (avg_speed, avg_cadence, max_cadence)):
             exelem = create_sub_element(lapelem, "Extensions")
             lx = create_sub_element(exelem, "LX")
             lx.set("xmlns",
