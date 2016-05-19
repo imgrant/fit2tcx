@@ -38,7 +38,7 @@ import UploadGarmin
 
 __prog__ = "trt2import"
 __desc__ = "Timex Run Trainer 2.0 FIT file importer"
-__version__ = "4.1"
+__version__ = "4.2"
 
 
 def main():
@@ -83,6 +83,10 @@ def main():
             "-f", "--calibration-factor",
             action="store", default=-1, type=float,
             help="Override watch calibration factor (default: read current factor from watch)")
+        parser.add_argument(
+            "-z", "--timezone",
+            action="store", default="auto", type=str,
+            help="Override timezone detection (default: lookup timezone from GPS data)")
         args = parser.parse_args()
 
         if (args.calibrate_footpod and
@@ -204,12 +208,13 @@ def main():
                     print("Error: unable to copy FIT file. ({err!s})".format(
                         err=e))
                     overallReturnCode = 2
+                    continue
 
                 # Convert to TCX
                 if args.convert_to_tcx:
                     try:
                         document = fit2tcx.convert(srcFit,
-                                                   tz_is_local=True,
+                                                   time_zone=args.timezone,
                                                    dist_recalc=args.recalculate_distance,
                                                    speed_recalc=args.recalculate_speed,
                                                    calibrate=args.calibrate_footpod,
@@ -229,9 +234,11 @@ def main():
                         print("Error: unable to convert FIT file to TCX. ({err!s})".format(
                             err=e))
                         overallReturnCode = 2
+                        continue
+                        
 
                 # Convert to GPX (via external call to GPSBabel)
-                if args.convert_to_gpx:
+                if args.convert_to_gpx and os.path.exists(dstTcx):
                     try:
                         subprocess.call(["gpsbabel",
                                          "-i", "gtrnctr",
@@ -249,7 +256,7 @@ def main():
                 # so we don't get confirmation. Also, the uploaded activities don't sync to other
                 # platforms (e.g. Strava), not sure if this is related to the 500 error or not.
                 # Uploading the file manually to GC works without error and triggers the sync.
-                if args.upload_to_gc:
+                if args.upload_to_gc and os.path.exists(dstTcx):
                     try:
                         status, id_msg = gc.upload_file(dstTcx)
                         if status == 'SUCCESS':
@@ -264,7 +271,7 @@ def main():
 
                 # If we converted to TCX with fit2tcx (above), then we can grab
                 # the notes and print some information about the activity.
-                if args.convert_to_tcx:
+                if args.convert_to_tcx and os.path.exists(dstTcx):
                     activity_notes = document.getroot().findtext(".//{*}Activity/{*}Notes")
                     if activity_notes is not None:
                         print("{notes!s}".format(notes=activity_notes))

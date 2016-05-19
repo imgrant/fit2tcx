@@ -31,8 +31,9 @@ The first four should be readily available via easy_install or pip. The version 
     optional arguments:
       -h, --help            show this help message and exit
       -v, --version         show program's version number and exit
-      -t, --local-timezone  FIT file timestamps are in a local timezone
-                            (default is assume UTC)
+      -z, --timezone        Specify the timezone for FIT file timestamps
+                            (default is to lookup the local timezone from the
+                            GPS data)
       -d, --recalculate-distance-from-gps
                             Recalculate distance from GPS data
       -s, --recalculate-speed-from-gps
@@ -50,8 +51,8 @@ The first four should be readily available via easy_install or pip. The version 
 
 
 ## Options
-* `--local-timezone`
- Use this option with the Timex Run Trainer 2.0, which incorrectly stores the time in the FIT file in the local timezone, rather than UTC (as mandated by the FIT specification). It converts the time to UTC by determining which local timezone applies to the activity based on the starting coordinates.
+* `--timezone`
+ Use this option with the Timex Run Trainer 2.0, which incorrectly stores the time in the FIT file in the local timezone, rather than UTC (as mandated by the FIT specification). By default (or if set to 'auto'), it converts the time to UTC by determining which local timezone applies to the activity based on the starting coordinates. For, e.g., a treadmill activity without GPS data, you can manually specify the timezone name, such as 'Europe/London'.
 
 * `--recalculate-distance-from-gps`
 This option recalculates the cumulative distance stream in the TCX file from the GPS data. Use this if you recorded distance from a footpod and wish to use the GPS data instead; if you used GPS to record the distance, there will be no (or little) difference.
@@ -127,6 +128,9 @@ The following python modules are required by trt2import:
       -f CALIBRATION_FACTOR, --calibration-factor CALIBRATION_FACTOR
                             Override watch calibration factor
                             (default: read current factor from watch)
+      -z TIMEZONE, --timezone TIMEZONE
+                            Override timezone detection
+                            (default: lookup the local timezone from GPS data)
 
 
 ## Options
@@ -151,7 +155,9 @@ If a file already exists at the target destination for a given FIT file on the w
 
 * `--per-lap-calibration` See fit2tcx (above) - only applies to TCX and GPX conversion
 
-* `--calibration-factor CALIBRATION_FACTOR` See fit2tcx - only applies to TCX and GPX conversion
+* `--calibration-factor CALIBRATION_FACTOR` See fit2tcx (above) - only applies to TCX and GPX conversion
+
+* `--timezone TIMEZONE` See fit2tcx (above)
 
 
 ## Notes

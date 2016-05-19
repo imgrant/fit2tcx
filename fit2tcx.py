@@ -23,7 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-__version__ = "1.3"
+__version__ = "1.4"
 
 import sys
 import copy
@@ -181,7 +181,7 @@ class MyDataProcessor(object):
     """
     Custom units data processor for FIT object
     """
-
+        
     def process_type_bool(self, field_data):
         if field_data.value is not None:
             field_data.value = bool(field_data.value)
@@ -208,16 +208,22 @@ class MyDataProcessor(object):
 class TZDataProcessor(MyDataProcessor):
 
     """
-    Extra data processor layer for working with local timezones.
-    Date-times claim to be UTC, but are actually an unknown local timezone.
-    We workout the timezone from the a given lat,lon point and re-normalize
-    date-times to UTC.
+    Extra data processor layer for working with timezones.
+    For the Timex Run Trainer 2.0, date-times claim to be UTC (as per the FIT 
+    format spec), but are actually an (unknown) local timezone.
+    If the data processor is called with a lat,lon point, we look up the true
+    timezone and re-normalize date-times to UTC.
+    Otherwise, if the data processor is called with a timezone name (defaults
+    to UTC, i.e. no difference), we use that and re-normalize.
     """
 
-    def __init__(self, lat, lon):
-        with nostdout():
-            w = tzwhere.tzwhere()
-        self.tz = timezone(w.tzNameAt(lat, lon))
+    def __init__(self, lat=None, lon=None, tzname="UTC"):
+        if lat is not None and lon is not None:
+            with nostdout():
+                w = tzwhere.tzwhere()
+            self.tz = timezone(w.tzNameAt(lat, lon))
+        else:
+            self.tz = timezone(tzname)
 
     def process_type_date_time(self, field_data):
         value = field_data.value
@@ -289,22 +295,31 @@ def sum_distance(activity,
                 prev_dist = 0
             else:
                 prev_dist = prev['distance']
-            try:
-                tp_timedelta = (tp['timestamp'] -
-                                prev['timestamp']).total_seconds()
-                gps_dist = GreatCircleDistance(
-                    (tp['position_lat'],
-                     tp['position_long']),
-                    (prev['position_lat'],
-                     prev['position_long'])
-                ).meters
-                gps_speed = (gps_dist / tp_timedelta)
-                # Fallback to existing distance/speed stream data
-                # if the GPS data looks erroneous (acceleration test)
-                if (gps_speed / tp_timedelta) > MAX_ACCELERATION:
+            if not None in (tp['position_lat'],
+                            tp['position_long'],
+                            prev['position_lat'],
+                            prev['position_long']):
+                try:
+                    tp_timedelta = (tp['timestamp'] -
+                                    prev['timestamp']).total_seconds()
+                    gps_dist = GreatCircleDistance(
+                        (tp['position_lat'],
+                         tp['position_long']),
+                        (prev['position_lat'],
+                         prev['position_long'])
+                    ).meters
+                    gps_speed = (gps_dist / tp_timedelta)
+                    # Fallback to existing distance/speed stream data
+                    # if the GPS data looks erroneous (acceleration test)
+                    if (gps_speed / tp_timedelta) > MAX_ACCELERATION:
+                        gps_dist = tp['distance'] - prev_dist
+                except:
+                    # Fallback to existing distance stream data on error
                     gps_dist = tp['distance'] - prev_dist
-            except:
+            else:
+                # Fallback to existing distance stream data if no GPS coords
                 gps_dist = tp['distance'] - prev_dist
+                
             distance += gps_dist
         prev = tp
 
@@ -827,7 +842,7 @@ def add_activity(element,
 
 
 def convert(filename,
-            tz_is_local=False,
+            time_zone="auto",
             dist_recalc=False,
             speed_recalc=False,
             calibrate=False,
@@ -850,11 +865,14 @@ def convert(filename,
     element = create_sub_element(document.getroot(), "Activities")
 
     try:
-        activity = FitFile(filename,
+        
+        if time_zone == "auto":
+            # We need activity object to be able to get trackpoints,
+            # before re-creating activity again with timezone info
+            activity = FitFile(filename,
                             check_crc=False,
                             data_processor=MyDataProcessor())
-        activity.parse()
-        if tz_is_local:
+            activity.parse()
             lat = None
             lon = None
             for trackpoint in activity.get_messages('record'):
@@ -862,11 +880,16 @@ def convert(filename,
                     break
                 lat = trackpoint.get_value("position_lat")
                 lon = trackpoint.get_value("position_long")
+            if lat is not None and lon is not None:
+                activity = FitFile(filename,
+                                   check_crc=False,
+                                   data_processor=TZDataProcessor(lat=lat,
+                                                                  lon=lon))
+        else:
             activity = FitFile(filename,
                                check_crc=False,
-                               data_processor=TZDataProcessor(lat=lat,
-                                                              lon=lon))
-            activity.parse()
+                               data_processor=TZDataProcessor(tzname=time_zone))
+        activity.parse()
 
         session = next(activity.get_messages('session'))
         total_activity_distance = session.get_value('total_distance')
@@ -973,10 +996,12 @@ def main():
         action='version',
         version='%(prog)s {version}'.format(version=__version__))
     parser.add_argument(
-        "-t",
-        "--local-timezone",
-        action="store_true",
-        help="FIT file timestamps are in a local timezone (default is UTC)")
+        "-z",
+        "--timezone",
+        action="store",
+        type=str,
+        default="auto",
+        help="Specify the timezone for FIT file timestamps (default, 'auto', uses GPS data to lookup the local timezone)")
     parser.add_argument(
         "-d",
         "--recalculate-distance-from-gps",
@@ -1022,7 +1047,7 @@ def main():
 
     try:
         document = convert(args.FitFile,
-                           args.local_timezone,
+                           args.timezone,
                            args.recalculate_distance_from_gps,
                            args.recalculate_speed_from_gps,
                            args.calibrate_footpod,
