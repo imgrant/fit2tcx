@@ -23,7 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-__version__ = "1.4"
+__version__ = "1.5"
 
 import sys
 import copy
@@ -703,14 +703,28 @@ def add_lap(element,
         if fixed_distance is not None:
             precision_str = ("; known distance: {ref_dist:.3f} km "
                              "(FIT precision: {fit_precision:.1f}%; "
-                             "GPS precision: {gps_precision:.1f}%)")
+                             "GPS/footpod precision: {gps_precision:.1f}%)")
             reference = "known distance"
         else:
             precision_str = " (precision: {precision:.1f}%)"
-            reference = "GPS"
+            reference = "GPS/footpod"
+        try:
+            fit_precision_calc = (1 - (abs(reference_distance -
+                                                  stored_distance) /
+                                              reference_distance)) * 100
+            gps_precision_calc = (1 - (abs(reference_distance -
+                                                  calculated_distance) /
+                                              reference_distance)) * 100
+            precision_calc = (1 - (abs(calculated_distance -
+                                                  stored_distance) /
+                                              calculated_distance)) * 100
+        except ZeroDivisionError:
+            fit_precision_calc = 100
+            gps_precision_calc = 100
+            precision_calc = 100
         notes = ("Lap {lap_number:d}: {distance_used:.3f} km in {total_time!s}\n"
                  "Distance in FIT file: {fit_dist:.3f} km; "
-                 "calculated via GPS: {gps_dist:.3f} km"
+                 "calculated via GPS/footpod: {gps_dist:.3f} km"
                  + precision_str + "\n"
                  "Footpod calibration factor setting: {old_cf:.1f}%; "
                  "new factor based on {reference} for this lap: {new_cf:.1f}%"
@@ -720,15 +734,9 @@ def add_lap(element,
                           fit_dist=stored_distance / 1000,
                           gps_dist=calculated_distance / 1000,
                           ref_dist=reference_distance / 1000,
-                          fit_precision=(1 - (abs(reference_distance -
-                                                  stored_distance) /
-                                              reference_distance)) * 100,
-                          gps_precision=(1 - (abs(reference_distance -
-                                                  calculated_distance) /
-                                              reference_distance)) * 100,
-                          precision=(1 - (abs(calculated_distance -
-                                                  stored_distance) /
-                                              calculated_distance)) * 100,
+                          fit_precision=fit_precision_calc,
+                          gps_precision=gps_precision_calc,
+                          precision=precision_calc,
                           old_cf=current_cal_factor,
                           reference=reference,
                           new_cf=lap_scaling_factor * current_cal_factor)
@@ -853,7 +861,7 @@ def convert(filename,
 
     # Calibration requires either GPS recalculation or manual lap distance(s):
     if calibrate and not dist_recalc and manual_lap_distance is None:
-        sys.stderr.write("Calibration requested, enabling distance recalculation from GPS.\n")
+        sys.stderr.write("Calibration requested, enabling distance recalculation from GPS/footpod.\n")
         dist_recalc = True
 
     # Calibration with manual lap distances implies
@@ -938,13 +946,13 @@ def convert(filename,
         if calibrate and manual_lap_distance is not None:
             reference = " from known distance (with GPS fill-in)"
         elif dist_recalc or speed_recalc:
-            reference = " from GPS"
+            reference = " from GPS/footpod"
 
         method = "(" + ", ".join(parts) + reference + ")"
 
     notes = ("{total_laps:d} laps: {distance_used:.3f} km in {total_time!s} {dist_method:s}\n"
              "Distance in FIT file: {fit_dist:.3f} km; "
-             "calculated via GPS: {gps_dist:.3f} km "
+             "calculated via GPS/footpod: {gps_dist:.3f} km "
              "(precision: {precision:.1f}%)\n"
              "Footpod calibration factor setting: {old_cf:.1f}%; "
              "new factor based on recomputed distance: {new_cf:.1f}%"
