@@ -23,7 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-__version__ = "1.5"
+__version__ = "1.6"
 
 import sys
 import copy
@@ -137,7 +137,8 @@ PRODUCT_MAP = {
     1752:	"HRM Run",
     10007:	"SDM4",
     20119:	"Training Center",
-    1623:	"Forerunner 620"}
+    1623:	"Forerunner 620",
+    2431:   "Forerunner 235"}
 
 
 """
